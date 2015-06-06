@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // locates this directory's parent `.git` directory and returns it, or an error
@@ -52,7 +53,37 @@ func gitPath() (string, error) {
 	return "", fmt.Errorf("No Git directory found.")
 }
 
+// finds the current branch of the current Git repository
+func gitCurrentBranch() (string, error) {
+	gitPath, err := gitPath()
+	if err != nil {
+		return "", err
+	}
+
+	// this file contains a pointer to the current branch which we can parse to
+	// determine the branch name.
+	headPath := path.Join(gitPath, "HEAD")
+
+	// read the HEAD file
+	data, err := ioutil.ReadFile(headPath)
+	if err != nil {
+		return "", err
+	}
+
+	refSpec := string(data)
+
+	// parse the HEAD file to get the branch name. the HEAD file contents look
+	// something like: `ref: refs/heads/master`. we split into three parts
+	refSpecParts := strings.SplitN(refSpec, "/", 3)
+	if len(refSpecParts) != 3 {
+		return "", fmt.Errorf("Could not parse HEAD file contents: '%s'", refSpec)
+	}
+
+	// return the third part of our split ref spec, the branch name
+	return strings.TrimSpace(refSpecParts[2]), nil
+}
+
 func main() {
-	g, _ := gitPath()
-	fmt.Printf(".git path: %s\n", g)
+	b, _ := gitCurrentBranch()
+	fmt.Println(b)
 }
