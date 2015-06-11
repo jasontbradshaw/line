@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -275,8 +277,43 @@ func prettifyPath(p string, targetLength int) (string, error) {
 	return p, nil
 }
 
+// returns the user/hostname of the system with a specifically-colored `@`
+func userAndHost() string {
+	// never mind the error, just use whatever came back
+	host, _ := os.Hostname()
+	user := os.Getenv("USER")
+
+	// turn the user/host combination into a color, then use that color as the
+	// foreground color of the `@` symbol, to help distinguish between terminals
+	// running on different hosts.
+	md5Hash := md5.New()
+	io.WriteString(md5Hash, user)
+	io.WriteString(md5Hash, host)
+	sum := md5Hash.Sum(nil)
+
+	// use the first three bytes as an RGB color, then convert to HSL so we can
+	// easily keep the color in a nice range. then convert back to RGB, then back
+	// to hex so we can display it!
+	r := int(sum[0])
+	g := int(sum[1])
+	b := int(sum[2])
+
+	h, s, l := rgbToHSL(r, g, b)
+
+	// desaturate a bit
+	s = s * 0.8
+
+	// scale our lightness to keep it readable against a dark background
+	minLightness := 0.3
+	maxLightness := 0.85
+	l = (l * (maxLightness - minLightness)) + minLightness
+
+	r, g, b = hslToRGB(h, s, l)
+	hex := rgbToHex(r, g, b)
+
+	return user + colored("@", hex) + host
+}
+
 func main() {
-	cwd, _ := os.Getwd()
-	p, _ := prettifyPath(cwd, 20)
-	fmt.Println("pretty path:", p)
+	fmt.Println(userAndHost())
 }
