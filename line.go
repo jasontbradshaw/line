@@ -74,17 +74,28 @@ func gitCurrentBranch() string {
 		return ""
 	}
 
-	refSpec := string(data)
+	refSpec := strings.TrimSpace(string(data))
 
 	// parse the HEAD file to get the branch name. the HEAD file contents look
-	// something like: `ref: refs/heads/master`. we split into three parts
+	// something like: `ref: refs/heads/master`. we split into three parts, then
+	// use whatever's left over as the branch name. If it doesn't split, it's
+	// probably a commit hash, in which case we use the first 8 characters of it
+	// as the branch name.
 	refSpecParts := strings.SplitN(refSpec, "/", 3)
-	if len(refSpecParts) != 3 {
-		panic(fmt.Sprintf("Could not parse HEAD file contents: '%s'", refSpec))
+	branchName := ""
+	if len(refSpecParts) == 3 {
+		// use the last part as the branch name
+		branchName = strings.TrimSpace(refSpecParts[2])
+	} else if len(refSpecParts) == 1 && len(refSpec) == 40 {
+		// we got a commit hash, use the first 7 characters as the branch name
+		branchName = refSpec[0:7]
+	} else {
+		// notify that we failed
+		branchName = "BAD_REF_SPEC (" + refSpec + ")"
 	}
 
 	// return the third part of our split ref spec, the branch name
-	return strings.TrimSpace(refSpecParts[2])
+	return branchName
 }
 
 // gets the current status symbols for the existing git repository as a map of
