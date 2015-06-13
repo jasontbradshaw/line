@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -57,10 +58,10 @@ func gitPath() (string, error) {
 }
 
 // finds the current branch of the current Git repository
-func gitCurrentBranch() (string, error) {
+func gitCurrentBranch() string {
 	gitPath, err := gitPath()
 	if err != nil {
-		return "", err
+		return ""
 	}
 
 	// this file contains a pointer to the current branch which we can parse to
@@ -70,7 +71,7 @@ func gitCurrentBranch() (string, error) {
 	// read the HEAD file
 	data, err := ioutil.ReadFile(headPath)
 	if err != nil {
-		return "", err
+		return ""
 	}
 
 	refSpec := string(data)
@@ -79,11 +80,35 @@ func gitCurrentBranch() (string, error) {
 	// something like: `ref: refs/heads/master`. we split into three parts
 	refSpecParts := strings.SplitN(refSpec, "/", 3)
 	if len(refSpecParts) != 3 {
-		return "", fmt.Errorf("Could not parse HEAD file contents: '%s'", refSpec)
+		panic(fmt.Sprintf("Could not parse HEAD file contents: '%s'", refSpec))
 	}
 
 	// return the third part of our split ref spec, the branch name
-	return strings.TrimSpace(refSpecParts[2]), nil
+	return strings.TrimSpace(refSpecParts[2])
+}
+
+// gets the current status symbols for the existing git repository as a map of
+// file name to status symbol, or nil if there's no repository.
+func gitCurrentStatus() map[string]string {
+	out, err := exec.Command("git", "status", "--porcelain").CombinedOutput()
+	if err != nil {
+		return nil
+	}
+
+	// turn the output into a map of file to status string
+	files := make(map[string]string)
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		// trim whitespace so we can reliably split out the status/name
+		line = strings.TrimSpace(line)
+
+		// split into a (status, file) pair
+		parts := strings.SplitN(line, " ", 2)
+		if len(parts) == 2 {
+			files[parts[1]] = parts[0]
+		}
+	}
+
+	return files
 }
 
 func compressWithTruncator(s string, truncator rune, maxLen int) string {
@@ -300,9 +325,6 @@ func userAndHost() string {
 
 	h, s, l := rgbToHSL(r, g, b)
 
-	// desaturate a bit
-	s = s * 0.8
-
 	// scale our lightness to keep it readable against a dark background
 	minLightness := 0.3
 	maxLightness := 0.85
@@ -311,9 +333,39 @@ func userAndHost() string {
 	r, g, b = hslToRGB(h, s, l)
 	hex := rgbToHex(r, g, b)
 
-	return user + colored("@", hex) + host
+	return user + trueColored("@", hex) + host
 }
 
+// print the status line!
 func main() {
-	fmt.Println(userAndHost())
+	cwd, _ := os.Getwd()
+	prettyPath, _ := prettifyPath(cwd, 20)
+	branch := gitCurrentBranch()
+
+	// pick a color for the branch depending on status output
+	branchColor := COLOR_GREEN
+	statuses := gitCurrentStatus()
+	if statuses != nil && len(statuses) > 0 {
+		hasUntracked := false
+		hasModified := false
+
+		for _, status := range statuses {
+			// true if we have untracked or added files
+			hasUntracked = hasUntracked || strings.ContainsAny(status, "A?")
+
+			// true if we have modified, renamed, deleted, or unstaged files
+			hasModified = hasModified || strings.ContainsAny(status, "MRDU")
+		}
+
+		if hasUntracked && !hasModified {
+			branchColor = COLOR_YELLOW
+		} else if hasModified {
+			branchColor = COLOR_RED
+		}
+	}
+
+	fmt.Printf("%s %s %s ➙ \n",
+		userAndHost(),
+		colored(prettyPath, COLOR_BLUE),
+		colored(branch, branchColor))
 }

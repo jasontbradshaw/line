@@ -11,6 +11,18 @@ const COLOR_RESET = COLOR_ESCAPE + "[0m"
 const COLOR_CODE_FOREGROUND = 38
 const COLOR_CODE_BACKGROUND = 48
 
+// standard colors
+const (
+	COLOR_BLACK   = 0
+	COLOR_RED     = 1
+	COLOR_GREEN   = 2
+	COLOR_YELLOW  = 3
+	COLOR_BLUE    = 4
+	COLOR_MAGENTA = 5
+	COLOR_CYAN    = 6
+	COLOR_WHITE   = 7
+)
+
 // converts an RGB color to hex
 func rgbToHex(r, g, b int) int {
 	return (r << 16) | (g << 8) | b
@@ -73,17 +85,17 @@ func rgbToHSL(r, g, b int) (float64, float64, float64) {
 		}
 
 		switch max {
-			case rf:
-				var x float64 = 0
-				if gf < bf {
-					x = 6
-				}
+		case rf:
+			var x float64 = 0
+			if gf < bf {
+				x = 6
+			}
 
-				h = (gf-bf)/d + x
-			case gf:
-				h = (bf-rf)/d + 2
-			case bf:
-				h = (rf-gf)/d + 4
+			h = (gf-bf)/d + x
+		case gf:
+			h = (bf-rf)/d + 2
+		case bf:
+			h = (rf-gf)/d + 4
 		}
 
 		h /= 6
@@ -118,6 +130,15 @@ func hslToRGB(h, s, l float64) (int, int, int) {
 	return int(rf * 255), int(gf * 255), int(bf * 255)
 }
 
+func color(colorCode int) string {
+	return fmt.Sprintf("%s[3%dm", COLOR_ESCAPE, colorCode)
+}
+
+func colored(s string, colorCode int) string {
+	fg := color(colorCode)
+	return fg + s + COLOR_RESET
+}
+
 // given a hex color, turns it into a true-color xterm escape sequence using
 // semicolons as parameter delimiters, with no background color.
 func trueColor(hexColor, specifierCode int) string {
@@ -127,14 +148,7 @@ func trueColor(hexColor, specifierCode int) string {
 
 // given a string, returns the string in the given color using xterm true-color
 // escape codes.
-func colored(s string, hexColorForeground int) string {
-	fg := trueColor(hexColorForeground, COLOR_CODE_FOREGROUND)
+func trueColored(s string, hexColor int) string {
+	fg := trueColor(hexColor, COLOR_CODE_FOREGROUND)
 	return fg + s + COLOR_RESET
-}
-
-// same as `colored`, but allows specifying the background color as well
-func coloredWithBackground(s string, hexColorForeground, hexColorBackground int) string {
-	fg := trueColor(hexColorForeground, COLOR_CODE_FOREGROUND)
-	bg := trueColor(hexColorBackground, COLOR_CODE_BACKGROUND)
-	return fg + bg + s + COLOR_RESET
 }
