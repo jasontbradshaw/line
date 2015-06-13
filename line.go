@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -313,18 +314,13 @@ func prettifyPath(p string, targetLength int) (string, error) {
 	return p, nil
 }
 
-// returns the user/hostname of the system with a specifically-colored `@`
-func userAndHost() string {
-	// never mind the error, just use whatever came back
-	host, _ := os.Hostname()
-	user := os.Getenv("USER")
-
+// given a string, returns a hex color based on its contents
+func colorHash(input string) int {
 	// turn the user/host combination into a color, then use that color as the
 	// foreground color of the `@` symbol, to help distinguish between terminals
 	// running on different hosts.
 	md5Hash := md5.New()
-	io.WriteString(md5Hash, user)
-	io.WriteString(md5Hash, host)
+	io.WriteString(md5Hash, input)
 	sum := md5Hash.Sum(nil)
 
 	// use the first three bytes as an RGB color, then convert to HSL so we can
@@ -342,15 +338,28 @@ func userAndHost() string {
 	l = (l * (maxLightness - minLightness)) + minLightness
 
 	r, g, b = hslToRGB(h, s, l)
-	hex := rgbToHex(r, g, b)
+	return rgbToHex(r, g, b)
+}
 
-	return user + trueColored("@", hex) + host
+// returns the user/hostname of the system with a specifically-colored `@`
+func userAndHost() string {
+	// never mind the error, just use whatever came back
+	host, _ := os.Hostname()
+	user := os.Getenv("USER")
+
+	c := colorHash(user + host)
+
+	return trueColored("[", c) + user + trueColored("@", c) + host + trueColored("]", c)
+}
+
+func currentTime() string {
+	return fmt.Sprintf("%d", time.Now().Unix())
 }
 
 // print the status line!
 func main() {
 	cwd, _ := os.Getwd()
-	prettyPath, _ := prettifyPath(cwd, 20)
+	prettyPath, _ := prettifyPath(cwd, 60)
 	branch := gitCurrentBranch()
 
 	// pick a color for the branch depending on status output
@@ -375,7 +384,8 @@ func main() {
 		}
 	}
 
-	fmt.Printf("%s %s %s ➙ \n",
+	fmt.Printf("┌╼ %s %s %s %s\n└╼ \n",
+		colored(currentTime(), COLOR_MAGENTA),
 		userAndHost(),
 		colored(prettyPath, COLOR_BLUE),
 		colored(branch, branchColor))
