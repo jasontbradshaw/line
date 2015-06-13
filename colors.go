@@ -7,7 +7,9 @@ import (
 
 // used to reset the color value to default
 const COLOR_ESCAPE = "\x1b"
-const COLOR_RESET = COLOR_ESCAPE + "[0m"
+const COLOR_NONPRINTABLE_START = "\001"
+const COLOR_NONPRINTABLE_END = "\002"
+const COLOR_RESET = COLOR_NONPRINTABLE_START + COLOR_ESCAPE + "[0m" + COLOR_NONPRINTABLE_END
 const COLOR_CODE_FOREGROUND = 38
 const COLOR_CODE_BACKGROUND = 48
 
@@ -131,7 +133,11 @@ func hslToRGB(h, s, l float64) (int, int, int) {
 }
 
 func color(colorCode int) string {
-	return fmt.Sprintf("%s[3%dm", COLOR_ESCAPE, colorCode)
+	return fmt.Sprintf("%s%s[3%dm%s",
+		COLOR_NONPRINTABLE_START,
+		COLOR_ESCAPE,
+		colorCode,
+		COLOR_NONPRINTABLE_END)
 }
 
 func colored(s string, colorCode int) string {
@@ -143,7 +149,12 @@ func colored(s string, colorCode int) string {
 // semicolons as parameter delimiters, with no background color.
 func trueColor(hexColor, specifierCode int) string {
 	r, g, b := hexToRGB(hexColor)
-	return fmt.Sprintf("%s[%d;2;%d;%d;%dm", COLOR_ESCAPE, specifierCode, r, g, b)
+	return fmt.Sprintf("%s%s[%d;2;%d;%d;%dm%s",
+		COLOR_NONPRINTABLE_START,
+		COLOR_ESCAPE,
+		specifierCode,
+		r, g, b,
+		COLOR_NONPRINTABLE_END)
 }
 
 // given a string, returns the string in the given color using xterm true-color
