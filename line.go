@@ -349,7 +349,7 @@ func userAndHost() string {
 
 	c := colorHash(user + host)
 
-	return trueColored("[", c) + user + trueColored("@", c) + host + trueColored("]", c)
+	return user + trueColored("@", c) + host
 }
 
 func currentTime() string {
